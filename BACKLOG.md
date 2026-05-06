@@ -20,6 +20,10 @@ Currently logs "Processing OCR..." once and blocks. For large documents, report 
 
 `#!/usr/bin/env python3.11` fails on systems with 3.12+. Nothing in the script requires exactly 3.11.
 
-## Add `.gitignore` and `.env.example`
+## Add `.env.example`
 
-Prevent accidental commit of `.env` with the API key. Provide `.env.example` documenting required variables.
+Provide `.env.example` documenting required variables. (`.gitignore` already done.)
+
+## Locate MISTRAL_API_KEY and centralize in `~/.env`
+
+The key is set somewhere on the system but its current location is unknown. Find it, then ensure it lives in `~/.env` as the single source. The script already uses `load_dotenv()` — may need to point it at `~/.env` explicitly or source `~/.env` from the shell profile.
