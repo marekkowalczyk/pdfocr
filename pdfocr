@@ -1,0 +1,180 @@
+#!/usr/bin/env python3.11
+import os
+import sys
+import argparse
+import requests
+import logging
+import signal  # Import the signal module
+from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Retrieve the Mistral API key from environment variables
+API_KEY = os.getenv("MISTRAL_API_KEY")
+if not API_KEY:
+    raise ValueError("MISTRAL_API_KEY environment variable not set")
+
+# Common headers for all requests
+HEADERS = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Accept": "application/json"
+}
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
+
+def log(message):
+    """Helper function to print debug messages to stderr with a prefix."""
+    logging.debug(message)
+
+def signal_handler(sig, frame):
+    """Signal handler for SIGINT and SIGTERM."""
+    log("Script interrupted.")
+    sys.exit(1)
+
+def create_session():
+    """Create a session with retry logic."""
+    session = requests.Session()
+    retries = Retry(
+        total=5,
+        backoff_factor=0.3,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "OPTIONS"]  # Use allowed_methods instead of method_whitelist
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
+def upload_file(file_path, session):
+    """
+    Uploads the PDF file to Mistral's files endpoint for OCR processing.
+    """
+    url = "https://api.mistral.ai/v1/files"
+    data = {"purpose": "ocr"}
+    with open(file_path, "rb") as file:
+        files = {
+            "file": (os.path.basename(file_path), file, "application/pdf")
+        }
+        response = session.post(url, headers=HEADERS, data=data, files=files)
+        response.raise_for_status()
+        return response.json()  # Expected to include an "id" field
+
+def get_signed_url(file_id, session):
+    """
+    Retrieves a signed URL for the uploaded file using its file ID.
+    """
+    url = f"https://api.mistral.ai/v1/files/{file_id}/url?expiry=24"
+    response = session.get(url, headers=HEADERS)
+    response.raise_for_status()
+    return response.json().get("url")
+
+def process_ocr(signed_url, session):
+    """
+    Calls the OCR endpoint with a JSON payload that references the signed URL.
+    """
+    url = "https://api.mistral.ai/v1/ocr"
+    payload = {
+        "model": "mistral-ocr-latest",
+        "document": {
+            "type": "document_url",
+            "document_url": signed_url
+        },
+        "include_image_base64": True
+    }
+    headers = {**HEADERS, "Content-Type": "application/json"}
+    response = session.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+    return response.json()
+
+def derive_output_filename(input_file):
+    """Automatically derive an output filename from the input PDF filename."""
+    base, ext = os.path.splitext(input_file)
+    if ext.lower() == ".pdf":
+        return f"{base}-ocr.md"
+    return f"{input_file}-ocr.md"
+
+def process_pdf(file_path):
+    # Create a session with retry logic
+    session = create_session()
+
+    # Step 1: Upload the PDF file
+    log("Uploading file...")
+    try:
+        upload_response = upload_file(file_path, session)
+        file_id = upload_response.get("id")
+        if not file_id:
+            log("File upload failed: no file ID returned.")
+            sys.exit(1)
+        log(f"Uploaded file ID: {file_id}")
+    except requests.exceptions.RequestException as e:
+        log(f"Error uploading file: {e}")
+        sys.exit(1)
+
+    # Step 2: Retrieve a signed URL for the uploaded file
+    log("Retrieving signed URL...")
+    try:
+        signed_url = get_signed_url(file_id, session)
+        if not signed_url:
+            log("Failed to get signed URL.")
+            sys.exit(1)
+        log(f"Signed URL: {signed_url}")
+    except requests.exceptions.RequestException as e:
+        log(f"Error retrieving signed URL: {e}")
+        sys.exit(1)
+
+    # Step 3: Process OCR using the signed URL
+    log("Processing OCR...")
+    try:
+        ocr_response = process_ocr(signed_url, session)
+        pages = ocr_response.get("pages", [])
+        if not pages:
+            log("No pages returned from OCR.")
+            return ""
+        output_lines = []
+        for page in pages:
+            markdown = page.get("markdown", "")
+            output_lines.append(markdown)
+        return "\n".join(output_lines)
+    except requests.exceptions.RequestException as e:
+        log(f"Error processing OCR: {e}")
+        sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Extract text from a PDF using Mistral OCR and output as Markdown."
+    )
+    parser.add_argument("pdf_file", help="Path to the PDF file to process")
+    parser.add_argument("-o", "--output", nargs="?", const="AUTO",
+                        help="Output file name. If omitted, automatically derived from input (e.g., input.pdf -> input-ocr.md). If not provided, output is sent to STDOUT.")
+    args = parser.parse_args()
+
+    # Register signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    if not os.path.isfile(args.pdf_file):
+        logging.error(f"The file '{args.pdf_file}' does not exist.")
+        sys.exit(1)
+
+    ocr_text = process_pdf(args.pdf_file)
+    if args.output is not None:
+        if args.output == "AUTO":
+            out_filename = derive_output_filename(args.pdf_file)
+        else:
+            out_filename = args.output
+        try:
+            with open(out_filename, "w", encoding="utf-8") as f:
+                f.write(ocr_text)
+            log(f"OCR output written to {out_filename}")
+        except Exception as e:
+            logging.error(f"Error writing to file {out_filename}: {e}")
+            sys.exit(1)
+    else:
+        print(ocr_text)
+
+if __name__ == "__main__":
+    main()
