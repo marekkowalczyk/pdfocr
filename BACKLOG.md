@@ -10,6 +10,14 @@ Logging is hardcoded to DEBUG. Default should be WARNING (errors only). Add `-v`
 
 Verbose mode should not print the signed URL (it's a bearer-style token). Truncate or omit it.
 
+### Add `--version` flag
+
+Print version and exit. Argparse already provides `-h`/`--help`.
+
+### Add `-q`/`--quiet` flag
+
+Suppress all output except errors (complement to `-v`).
+
 ### Change shebang to `python3`
 
 `#!/usr/bin/env python3.11` fails on systems with 3.12+. Nothing in the script requires exactly 3.11.
