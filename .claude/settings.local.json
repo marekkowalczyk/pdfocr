@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm /usr/local/bin/pdfocr)",
+      "Bash(ln -s /Users/marekkowalczyk/repos/pdfocr/pdfocr /usr/local/bin/pdfocr)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}
