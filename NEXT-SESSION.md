@@ -1,4 +1,5 @@
 # Next Session
 
-- Implement "Unix hygiene" milestone: default logging to WARNING, add `-v`/`-q` flags, `--version`, stop logging signed URL, fix shebang
-- Consider tackling "Correctness" milestone next (POST retry + file cleanup)
+No open backlog items. Consider:
+- Testing with real PDFs to surface any issues
+- New feature ideas (batch mode, multiple input files, custom model selection)
