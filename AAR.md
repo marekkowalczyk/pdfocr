@@ -2,6 +2,19 @@
 
 Continuous improvement log. Each session ends with a brief review: what went well, what didn't, what to change. This is the POOGI (Process Of Ongoing Improvement) record for this project.
 
+## 2026-06-24 — Implemented all backlog milestones
+
+**What went well:**
+- All four milestones implemented in one session without needing to revisit scope
+- Moving API key check into `main()` was the right fix for `--version` working without a key set
+
+**What didn't go well:**
+- Changing the shebang from `python3.11` to `python3` broke the installed command — `python3` on this system is 3.13 and doesn't have `requests`. Had to revert immediately after the user reported the error.
+
+**What we'll do differently:**
+- Before changing the shebang, verify that `python3 -c "import requests"` succeeds first
+- The shebang stays `python3.11` on this machine — deps are installed there, not under the system `python3`
+
 ## 2026-05-16 — Backlog restructured into milestones; added README
 
 **What went well:**
