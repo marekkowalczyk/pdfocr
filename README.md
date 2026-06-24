@@ -18,14 +18,18 @@ ln -s /path/to/pdfocr /usr/local/bin/pdfocr
 
 ## Configuration
 
-Set `MISTRAL_API_KEY` in your environment or in a `.env` file in the working directory.
+Set `MISTRAL_API_KEY` in `~/.env` (global) or a `.env` in the working directory. See `.env.example`.
 
 ## Usage
 
 ```bash
 pdfocr input.pdf              # output to stdout
 pdfocr input.pdf -o           # output to input-ocr.md (auto-derived)
-pdfocr input.pdf -o out.md   # output to specific file
+pdfocr input.pdf -o out.md    # output to specific file
+pdfocr input.pdf -v           # verbose progress output
+pdfocr input.pdf -q           # suppress all output except errors
+pdfocr input.pdf --images     # include base64-encoded images in output
+pdfocr --version              # print version and exit
 ```
 
 ## How it works
@@ -34,6 +38,7 @@ pdfocr input.pdf -o out.md   # output to specific file
 2. Retrieves a signed URL for the uploaded file
 3. Calls `/v1/ocr` with that URL (model: `mistral-ocr-latest`)
 4. Concatenates per-page Markdown output
+5. Deletes the uploaded file from Mistral's servers
 
 ## License
 

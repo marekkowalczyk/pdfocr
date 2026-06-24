@@ -11,15 +11,20 @@ A single-file Python CLI tool (`pdfocr`) that extracts text from PDFs using the 
 The script is symlinked from `/usr/local/bin/pdfocr` so it's available system-wide.
 
 ```bash
-# Requires MISTRAL_API_KEY in environment or .env file
+# Requires MISTRAL_API_KEY in ~/.env or local .env
 pdfocr input.pdf            # output to stdout
 pdfocr input.pdf -o         # output to input-ocr.md (auto-derived name)
 pdfocr input.pdf -o out.md  # output to specific file
+pdfocr input.pdf -v         # verbose progress output
+pdfocr input.pdf -q         # suppress all output except errors
+pdfocr input.pdf --images   # include base64-encoded images in output
+pdfocr --version            # print version and exit
 ```
 
 ## Dependencies
 
-Python 3.11, plus: `requests`, `python-dotenv`. Install with:
+Python 3.11 (shebang is `python3.11` — do NOT change to `python3`, which resolves to 3.13 on this machine and does not have the required packages). Packages: `requests`, `python-dotenv`.
+
 ```bash
 pip install requests python-dotenv
 ```
@@ -31,9 +36,10 @@ Single executable script (`pdfocr`), no shebang-less modules. The workflow is:
 2. Get a signed URL via `/v1/files/{id}/url`
 3. Call `/v1/ocr` with that URL, model `mistral-ocr-latest`
 4. Concatenate per-page markdown output
+5. Delete the uploaded file via `DELETE /v1/files/{id}`
 
-Retry logic (5 retries with backoff) is built into the requests session for transient HTTP errors.
+Retry logic (5 retries with backoff) covers GET and POST requests. API key is loaded from `~/.env` first, then local `.env` (local overrides global). Key check happens inside `main()` so `--version`/`--help` work without a key.
 
 ## Backlog
 
-See `BACKLOG.md` for known improvement ideas.
+See `BACKLOG.md`.
