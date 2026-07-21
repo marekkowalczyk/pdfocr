@@ -1,44 +1,34 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+CLI tool that extracts text from PDFs using the Mistral OCR API and outputs Markdown.
 
-## What This Is
+See [README.md](README.md) for installation, usage, and configuration — this file only carries notes that don't belong in user-facing docs.
 
-A single-file Python CLI tool (`pdfocr`) that extracts text from PDFs using the Mistral OCR API and outputs Markdown. No build step, no tests, no package manager config.
+## Project structure
 
-## Running
+- `pdfocr` — single-file Python script, symlinked to `/usr/local/bin/`
+- `requirements.txt` — pinned runtime dependencies (`requests`, `python-dotenv`)
+- `requirements-dev.txt` — adds `pytest` for running `tests/`
+- `tests/` — black-box CLI tests (invoke the script as a subprocess)
+- `.venv/` — project-local virtual environment (git-ignored)
+- `~/.env` — API key (outside the repo, not git-ignored since it's not tracked)
 
-The script is symlinked from `/usr/local/bin/pdfocr` so it's available system-wide.
+## Notes
 
-```bash
-# Requires MISTRAL_API_KEY in ~/.env or local .env
-pdfocr input.pdf            # output to stdout
-pdfocr input.pdf -o         # output to input-ocr.md (auto-derived name)
-pdfocr input.pdf -o out.md  # output to specific file
-pdfocr input.pdf -v         # verbose progress output
-pdfocr input.pdf -q         # suppress all output except errors
-pdfocr input.pdf --images   # include base64-encoded images in output
-pdfocr --version            # print version and exit
-```
+- Shebang is `#!/usr/bin/env python3`; the script re-execs itself under this project's own `.venv/bin/python3` (resolved from the script's real file path). Do not hardcode an absolute interpreter path in the shebang — that breaks portability across machines/users, and has bitten this project before (see `AAR.md`).
+- Retry logic covers both GET and POST — the OCR/upload calls are POSTs, and 429/5xx is the most common failure mode with API rate limits.
+- The API key check happens inside `main()` (not at import time) so `--version`/`--help` work without a key set.
+- **Gotcha:** the bare `load_dotenv()` call (loading local `.env`) searches *upward from the script's own file location* for a `.env` file — not from the process's cwd, and not affected by `$HOME`. If an ancestor directory of the repo has its own `.env`, it gets picked up. Tests that need to simulate "no API key present" on a machine that already has a real `~/.env` must move it aside for the duration of the test (see the `no_real_dotenv` fixture in `tests/test_pdfocr.py`) — env-var/HOME tricks alone don't defeat this search.
+- Exit codes follow `sysexits.h` conventions and signals exit `128+signum` — see README for the full mapping. Bump `VERSION` (semver) whenever a change alters user-facing behavior — new flags, exit codes, output format, etc.
 
-## Dependencies
-
-Python 3.11 (shebang is `python3.11` — do NOT change to `python3`, which resolves to 3.13 on this machine and does not have the required packages). Packages: `requests`, `python-dotenv`.
+## Testing
 
 ```bash
-pip install requests python-dotenv
+.venv/bin/python -m pytest tests/                     # all tests
+.venv/bin/python -m pytest tests/ -k "not real_ocr"    # skip real-API tests
 ```
 
-## Architecture
-
-Single executable script (`pdfocr`), no shebang-less modules. The workflow is:
-1. Upload PDF to Mistral's `/v1/files` endpoint
-2. Get a signed URL via `/v1/files/{id}/url`
-3. Call `/v1/ocr` with that URL, model `mistral-ocr-latest`
-4. Concatenate per-page markdown output
-5. Delete the uploaded file via `DELETE /v1/files/{id}`
-
-Retry logic (5 retries with backoff) covers GET and POST requests. API key is loaded from `~/.env` first, then local `.env` (local overrides global). Key check happens inside `main()` so `--version`/`--help` work without a key.
+Most tests need no network access or API key. Two (`test_real_ocr`, `test_real_ocr_stdin`) hit the real Mistral API and are skipped automatically unless `~/.env` exists — each costs a small amount ($4/1000 pages). Run the suite before tagging a release, and whenever exit-code or argument-parsing logic changes.
 
 ## Backlog
 
