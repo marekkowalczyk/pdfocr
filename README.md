@@ -64,4 +64,4 @@ pages) each time they run.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

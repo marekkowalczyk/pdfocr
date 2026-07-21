@@ -1,5 +1,7 @@
 # Next Session
 
+**Released as [v1.2.0](https://github.com/marekkowalczyk/pdfocr/releases/tag/v1.2.0)** (2026-07-21).
+
 No open backlog items from the Unix citizenship milestone — all implemented
 (sysexits exit codes, 128+signum signals, stdin/batch input). See
 `BACKLOG.md` for unscoped future ideas (`--model` override, OCR
