@@ -9,12 +9,16 @@ Continuous improvement log. Each session ends with a brief review: what went wel
 - Spotting `urltomd`'s project-local `.venv` + self-re-exec shebang pattern and porting it over fixed a real portability problem (the previous shebang hardcoded this machine's username).
 - Writing the test suite surfaced a genuine bug in the test's own isolation logic: `load_dotenv()`'s bare call searches upward from the *script's file location*, not cwd or `$HOME` — env-var/HOME tricks didn't stop it from finding the real `~/.env`. Had to move the real file aside for the duration of that one test.
 - Comparing `CLAUDE.md` against `urltomd`'s leaner version caught real duplication (usage/install/architecture repeated near-verbatim from README) before it caused another staleness incident like the shebang one below.
+- Before making the repo public, scanning full git history for committed secrets (`.env`, API keys, tokens) first caught the gap cheaply — the LICENSE/README mismatch was found the same way, before anyone browsing the newly-public repo would.
+- Tagged and published a proper GitHub release (v1.2.0) with real release notes, and verified it through the authenticated `gh api` rather than trusting an unauthenticated `WebFetch` 404 (which was just the repo being private at the time, not a broken release).
 
 **What didn't go well:**
 - `.claude/settings.local.json` was tracked in git (unlike the other two project repos), so a session's worth of one-off permission approvals showed up as unwanted diff noise and had to be untracked after the fact.
+- `README.md` had claimed MIT since early in the project's history with no actual `LICENSE` file backing it — a latent gap that only mattered once the repo went public.
 
 **What we'll do differently:**
 - When comparing conventions across sibling repos (venv layout, CLAUDE.md structure, `.gitignore` contents), check whether *this* repo already diverges from the others as a first step — the divergence itself is often the thing worth fixing, not just the immediate ask.
+- Before flipping a repo's visibility to public, run the secret-scan + license-file check proactively rather than waiting to be asked — both are cheap, and the cost of skipping them only shows up after the repo is already exposed.
 
 ## 2026-06-24 — Implemented all backlog milestones
 
