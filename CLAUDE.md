@@ -20,6 +20,7 @@ See [README.md](README.md) for installation, usage, and configuration — this f
 - The API key check happens inside `main()` (not at import time) so `--version`/`--help` work without a key set.
 - **Gotcha:** the bare `load_dotenv()` call (loading local `.env`) searches *upward from the script's own file location* for a `.env` file — not from the process's cwd, and not affected by `$HOME`. If an ancestor directory of the repo has its own `.env`, it gets picked up. Tests that need to simulate "no API key present" on a machine that already has a real `~/.env` must move it aside for the duration of the test (see the `no_real_dotenv` fixture in `tests/test_pdfocr.py`) — env-var/HOME tricks alone don't defeat this search.
 - Exit codes follow `sysexits.h` conventions and signals exit `128+signum` — see README for the full mapping. Bump `VERSION` (semver) whenever a change alters user-facing behavior — new flags, exit codes, output format, etc.
+- `-f`/`--fast` shells out to the `pdftotext` binary (poppler) to pull the embedded text layer instead of calling the OCR API — no API key required, outputs plain `.txt`. It does **no** quality check: the user is responsible for choosing when a PDF's text layer is trustworthy, and there is no automatic fallback to OCR. Poppler is an optional runtime dep (only needed for `-f`), so it's intentionally not in `requirements.txt`.
 
 ## Testing
 

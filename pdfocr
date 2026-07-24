@@ -14,12 +14,13 @@ import argparse
 import requests
 import logging
 import signal
+import subprocess
 import tempfile
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # sysexits.h-style exit codes, so callers can branch on failure class
 EX_OK = 0
@@ -117,13 +118,38 @@ def process_ocr(signed_url, session, include_images=False):
     return response.json()
 
 
-def derive_output_filename(input_file):
+def derive_output_filename(input_file, fast=False):
+    # Fast path is not OCR, so it drops the '-ocr' marker and uses .txt,
+    # matching what `pdftotext input.pdf` produces natively.
+    tail = ".txt" if fast else "-ocr.md"
     if input_file == "-":
-        return "stdin-ocr.md"
+        return f"stdin{tail}"
     base, ext = os.path.splitext(input_file)
     if ext.lower() == ".pdf":
-        return f"{base}-ocr.md"
-    return f"{input_file}-ocr.md"
+        return f"{base}{tail}"
+    return f"{input_file}{tail}"
+
+
+def extract_text_layer(file_path):
+    """Fast path: pull the PDF's embedded text layer via pdftotext, no OCR/API.
+
+    The caller is responsible for deciding the text layer is trustworthy;
+    this does no quality check and returns whatever pdftotext produces.
+    """
+    try:
+        result = subprocess.run(
+            ["pdftotext", "-enc", "UTF-8", file_path, "-"],
+            capture_output=True, check=True,
+        )
+    except FileNotFoundError:
+        raise OcrError(
+            "pdftotext not found. Install poppler (e.g. 'brew install poppler').",
+            EX_UNAVAILABLE,
+        )
+    except subprocess.CalledProcessError as e:
+        msg = e.stderr.decode("utf-8", "replace").strip() or f"pdftotext exited {e.returncode}"
+        raise OcrError(f"pdftotext failed: {msg}", EX_UNAVAILABLE)
+    return result.stdout.decode("utf-8", "replace")
 
 
 def process_pdf(file_path, include_images=False):
@@ -189,6 +215,10 @@ def main():
                         help="Suppress all output except errors.")
     parser.add_argument("--images", action="store_true",
                         help="Include base64-encoded images in OCR output.")
+    parser.add_argument("-f", "--fast", action="store_true",
+                        help="Fast path: extract the embedded text layer with pdftotext "
+                             "instead of calling the OCR API. Outputs plain .txt, needs no "
+                             "API key. You decide when the PDF's text layer is trustworthy.")
     parser.add_argument("--version", action="version", version=f"pdfocr {VERSION}")
     args = parser.parse_args()
 
@@ -202,12 +232,17 @@ def main():
         logging.error("stdin ('-') can only be used once.")
         sys.exit(EX_USAGE)
 
-    api_key = os.getenv("MISTRAL_API_KEY")
-    if not api_key:
-        logging.error("MISTRAL_API_KEY environment variable not set")
-        sys.exit(EX_CONFIG)
-    HEADERS["Authorization"] = f"Bearer {api_key}"
-    HEADERS["Accept"] = "application/json"
+    if args.fast and args.images:
+        logging.error("--images has no effect with --fast (no OCR is performed).")
+        sys.exit(EX_USAGE)
+
+    if not args.fast:
+        api_key = os.getenv("MISTRAL_API_KEY")
+        if not api_key:
+            logging.error("MISTRAL_API_KEY environment variable not set")
+            sys.exit(EX_CONFIG)
+        HEADERS["Authorization"] = f"Bearer {api_key}"
+        HEADERS["Accept"] = "application/json"
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -221,7 +256,10 @@ def main():
 
         read_path, cleanup = resolve_input(pdf_file)
         try:
-            ocr_text = process_pdf(read_path, include_images=args.images)
+            if args.fast:
+                ocr_text = extract_text_layer(read_path)
+            else:
+                ocr_text = process_pdf(read_path, include_images=args.images)
         except OcrError as e:
             logging.error(str(e))
             exit_code = e.code if len(args.pdf_files) == 1 else 1
@@ -231,7 +269,7 @@ def main():
                 cleanup()
 
         if args.output is not None:
-            out_filename = derive_output_filename(pdf_file) if args.output == "AUTO" else args.output
+            out_filename = derive_output_filename(pdf_file, fast=args.fast) if args.output == "AUTO" else args.output
             try:
                 with open(out_filename, "w", encoding="utf-8") as f:
                     f.write(ocr_text)

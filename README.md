@@ -31,10 +31,25 @@ pdfocr input.pdf -o out.md    # output to specific file
 pdfocr input.pdf -v           # verbose progress output
 pdfocr input.pdf -q           # suppress all output except errors
 pdfocr input.pdf --images     # include base64-encoded images in output
+pdfocr input.pdf -f           # fast: extract the embedded text layer, no OCR (see below)
 pdfocr a.pdf b.pdf -o         # batch: process multiple files, each auto-derived
 pdfocr - < input.pdf          # read a single PDF from stdin
 pdfocr --version              # print version and exit
 ```
+
+### Fast mode (`-f` / `--fast`)
+
+For PDFs that already carry a good embedded text layer (born-digital exports,
+not scans), `-f` skips the OCR API entirely and extracts text with
+[`pdftotext`](https://poppler.freedesktop.org/) instead. This is free, offline,
+and instant — but produces **plain `.txt`, not Markdown**, with no table or
+heading reconstruction, and no quality check. You decide when a PDF's text
+layer is trustworthy; there's no automatic fallback to OCR.
+
+- Auto-derived output is `input.txt` (no `-ocr` marker, since no OCR happens).
+- No `MISTRAL_API_KEY` is required.
+- Requires the `pdftotext` binary (`brew install poppler`, or your distro's
+  poppler-utils package).
 
 Exit codes follow `sysexits.h` conventions (0 success, 64 usage error, 66 input
 file missing, 69 network/API unavailable, 73 can't write output, 76 bad API

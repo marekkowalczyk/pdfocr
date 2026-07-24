@@ -2,6 +2,22 @@
 
 Continuous improvement log. Each session ends with a brief review: what went well, what didn't, what to change. This is the POOGI (Process Of Ongoing Improvement) record for this project.
 
+## 2026-07-24 — Fast path (`-f`/`--fast`), v1.3.0
+
+**What went well:**
+- The `-f` text-layer path dropped in with minimal surface area: it reused the existing `resolve_input`/output-naming/`OcrError` plumbing and only needed a new `extract_text_layer()` plus two branches in `main()` (skip the API-key check, swap the extraction fn).
+- Pushed back on the user's original "auto-detect good text vs. garbage" framing before writing any code — the honest answer was that a reliable quality gate is the hard part and a silent quality regression is worse than the status quo. The user reframed it as an explicit, opt-in, user-owns-the-judgment flag, which is a much cleaner design.
+- Named the output plain `input.txt` rather than `input-ocr.txt`: the `-ocr` marker would be a lie (no OCR happens) and plain `.txt` matches native `pdftotext` output — least surprise for the muscle memory the flag is meant to serve.
+- Kept poppler an *optional* runtime dep (not in `requirements.txt`), with a clear "install poppler" error when the binary is missing, so the pure-Python default install is unchanged.
+- Forced `-enc UTF-8` on the `pdftotext` call for deterministic output encoding, and made `--fast --images` a hard usage error rather than a silent no-op.
+
+**What didn't go well:**
+- No automated tests for the new path (a deliberate, user-approved call). Verified manually via a hand-crafted text-layer PDF; my first throwaway test PDF had a sloppy content stream that produced garbled reading order and briefly looked like a tool bug before I recognized it as the fixture's fault.
+
+**What we'll do differently:**
+- When smoke-testing an extraction feature, build the minimal fixture correctly the first time (or use a known-good PDF) so fixture artifacts don't masquerade as regressions.
+- Revisit test coverage for `-f` if it ever gains a quality heuristic or an automatic fallback to OCR — at that point the behavior stops being a pure pass-through and the judgment is no longer entirely the user's.
+
 ## 2026-07-21 — Unix citizenship, project-local venv, tests
 
 **What went well:**

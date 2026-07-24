@@ -1,9 +1,15 @@
 # Backlog
 
 Unix citizenship milestone implemented as of 2026-07-21 (sysexits-style exit
-codes, 128+signum on signal exit, stdin/batch input support). Remaining ideas
-below are unscoped — not yet committed to, just captured for future
-consideration.
+codes, 128+signum on signal exit, stdin/batch input support).
+
+Fast text-layer path (`-f`/`--fast`, via `pdftotext`) shipped in v1.3.0
+(2026-07-24). This is a deliberately dumb, opt-in pass-through with no quality
+check — it is *not* the automatic "skip OCR when the text layer is good"
+idea, which would need a garbage-detection heuristic and remains unscoped.
+
+Remaining ideas below are unscoped — not yet committed to, just captured for
+future consideration.
 
 ## Milestone: OCR model
 
